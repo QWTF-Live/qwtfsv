@@ -2,8 +2,8 @@
 
 FTEMANIFEST 1
 game quake
-name "FortressOne"
+name "QwtfLive"
 basegame id1
 gamedir fortress
 disablehomedir 1
-protocolname FortressOne
+protocolname QwtfLive

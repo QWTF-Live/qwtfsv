@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
-WORKDIR /fortressonesv
+WORKDIR /qwtfsv
 EXPOSE 27500/udp
-ARG FTE_CONFIG=fortressone
+ARG FTE_CONFIG=qwtflive
 RUN apt-get update \
  && apt-get install -y \
     curl \
@@ -13,15 +13,15 @@ RUN apt-get update \
     subversion \
     zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
-COPY . /fortressonesv/
-RUN cd /fortressonesv/fortress/dats/ \
+COPY . /qwtfsv/
+RUN cd /qwtfsv/fortress/dats/ \
  && curl \
     --location \
     --remote-name-all \
-    http://github.com/FortressOne/server-qwprogs/releases/latest/download/{qwprogs,csprogs,menu}.dat \
- && cd /fortressonesv/
-ENTRYPOINT ["/fortressonesv/fortressone-sv"]
+    https://qwtflive-dats.s3.amazonaws.com/staging/{qwprogs,csprogs,menu}.dat \
+ && cd /qwtfsv/
+ENTRYPOINT ["/qwtfsv/fteqw-sv"]
 CMD ["-ip", "localhost", \
-     "+set", "hostname", "FortressOne", \
+     "+set", "hostname", "QwtfLive", \
      "+exec", "fo_pubmode.cfg", \
      "+map", "2fort5r"]
