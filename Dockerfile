@@ -24,4 +24,5 @@ ENTRYPOINT ["/qwtfsv/fteqw-sv"]
 CMD ["-ip", "localhost", \
      "+set", "hostname", "QwtfLive", \
      "+exec", "fo_pubmode.cfg", \
-     "+map", "2fort5r"]
+     "+map", "2fort5r", \
+     "+exec", "fo_pubmode_maps.cfg"]
