@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 WORKDIR /qwtfsv
 EXPOSE 27500/udp
 ARG FTE_CONFIG=qwtflive
