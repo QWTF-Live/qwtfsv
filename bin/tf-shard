@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# fo-shard <name> - run one server shard in the foreground, under s6.
+# tf-shard <name> - run one server shard in the foreground, under s6.
 #
 # Everything that differs between the five shards lives in shards.conf; this
 # turns one row of it into an fteqw-sv command line.
@@ -16,10 +16,10 @@ set -euo pipefail
 CONF=/qwtfsv/shards.conf
 SRV=/srv
 
-name="${1:?usage: fo-shard <name>}"
+name="${1:?usage: tf-shard <name>}"
 
 row=$(awk -v n="$name" '$1==n && $1 !~ /^#/ {print; exit}' "$CONF")
-[[ -n $row ]] || { echo "fo-shard: no shard '$name' in $CONF" >&2; exit 1; }
+[[ -n $row ]] || { echo "tf-shard: no shard '$name' in $CONF" >&2; exit 1; }
 read -r _ port dats cfg map flags channel <<<"$row"
 
 home="$SRV/shards/$name"

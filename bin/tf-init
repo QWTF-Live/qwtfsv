@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# fo-init - lay out the persistent volume and point the basedir at it.
+# tf-init - lay out the persistent volume and point the basedir at it.
 #
 # Runs once at container start, before anything else. Everything it creates is
 # on /srv (the one data volume), so a recreated container keeps its maps, dats,
@@ -48,7 +48,7 @@ live="$CERTS/live/$fqdn"
 if [[ -n $fqdn && -s $live/fullchain.pem && -s $live/privkey.pem ]]; then
   ln -sfn "$live/fullchain.pem" /qwtfsv/fullchain.pem
   ln -sfn "$live/privkey.pem"   /qwtfsv/privkey.pem
-  echo "fo-init: using certbot certificate for $fqdn"
+  echo "tf-init: using certbot certificate for $fqdn"
 else
-  echo "fo-init: no certbot certificate for ${fqdn:-<unset>}; keeping the bundled self-signed pair" >&2
+  echo "tf-init: no certbot certificate for ${fqdn:-<unset>}; keeping the bundled self-signed pair" >&2
 fi

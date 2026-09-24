@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""fo-players <port> - how many clients are on that shard right now.
+"""tf-players <port> - how many clients are on that shard right now.
 
 Plain QuakeWorld status query over UDP, so it needs no rcon password and does
 not disturb the server. Used by certwatch to find a moment when restarting a
@@ -30,6 +30,6 @@ if __name__ == "__main__":
     try:
         print(players(int(sys.argv[1])))
     except (IndexError, ValueError):
-        sys.exit("usage: fo-players <port>")
+        sys.exit("usage: tf-players <port>")
     except OSError:
         sys.exit(1)

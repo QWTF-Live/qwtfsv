@@ -51,11 +51,11 @@ RUN cd /qwtfsv/fortress/dats/ \
     https://qwtflive-dats.s3.amazonaws.com/staging/{qwprogs,csprogs,menu}.dat \
  && cd /qwtfsv/
 
-RUN ln -sf /qwtfsv/bin/fo-shard     /usr/local/bin/fo-shard \
- && ln -sf /qwtfsv/bin/fo-console   /usr/local/bin/fo-console \
- && ln -sf /qwtfsv/bin/fo-players   /usr/local/bin/fo-players \
- && ln -sf /qwtfsv/bin/fo-certwatch /usr/local/bin/fo-certwatch \
- && ln -sf /usr/local/bin/fo-console /usr/local/bin/console
+RUN ln -sf /qwtfsv/bin/tf-shard     /usr/local/bin/tf-shard \
+ && ln -sf /qwtfsv/bin/tf-console   /usr/local/bin/tf-console \
+ && ln -sf /qwtfsv/bin/tf-players   /usr/local/bin/tf-players \
+ && ln -sf /qwtfsv/bin/tf-certwatch /usr/local/bin/tf-certwatch \
+ && ln -sf /usr/local/bin/tf-console /usr/local/bin/console
 
 # One s6 service per row of shards.conf, so adding a shard is a one-line edit
 # there rather than a new directory here.
@@ -66,7 +66,7 @@ RUN set -eu; \
       mkdir -p "$dir/dependencies.d"; \
       echo longrun > "$dir/type"; \
       touch "$dir/dependencies.d/init"; \
-      printf '#!/command/with-contenv bash\nexec fo-shard %s\n' "$name" > "$dir/run"; \
+      printf '#!/command/with-contenv bash\nexec tf-shard %s\n' "$name" > "$dir/run"; \
       chmod +x "$dir/run"; \
       touch "/etc/s6-overlay/s6-rc.d/user/contents.d/$name"; \
     done
@@ -75,7 +75,7 @@ RUN set -eu; \
 EXPOSE 27500/udp 27501/udp 27504/udp 27505/udp 27510/udp
 
 # KEEP_ENV: the shards read TF_* straight from the container environment.
-# STAGE2_FAILS=2: if fo-init cannot lay out /srv there is no point coming
+# STAGE2_FAILS=2: if tf-init cannot lay out /srv there is no point coming
 # up half-configured - fail the container so `up -d` reports it.
 ENV S6_KEEP_ENV=1 \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 \

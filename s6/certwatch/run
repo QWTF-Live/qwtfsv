@@ -1,2 +1,2 @@
 #!/command/with-contenv bash
-exec /qwtfsv/bin/fo-certwatch
+exec /qwtfsv/bin/tf-certwatch

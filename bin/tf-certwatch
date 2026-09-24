@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# fo-certwatch - restart shards onto a renewed certificate, one at a time,
+# tf-certwatch - restart shards onto a renewed certificate, one at a time,
 # without interrupting anyone's game.
 #
 # FTE reads fullchain.pem/privkey.pem once at startup and has no reload
@@ -46,7 +46,7 @@ while sleep "$POLL"; do
     remaining=""
     while read -r name port; do
       [[ -n $name ]] || continue
-      if count=$(fo-players "$port" 2>/dev/null) && [[ $count -eq 0 ]]; then
+      if count=$(tf-players "$port" 2>/dev/null) && [[ $count -eq 0 ]]; then
         log "restarting $name (empty)"
         s6-svc -r "/run/service/$name" || log "  ! s6-svc failed for $name"
       elif [[ $(date +%s) -ge $deadline ]]; then
