@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""fo-players <port> - how many clients are on that shard right now.
+
+Plain QuakeWorld status query over UDP, so it needs no rcon password and does
+not disturb the server. Used by certwatch to find a moment when restarting a
+shard costs nobody their game.
+
+Exits 0 with the count on stdout; exits 1 if the server did not answer, which
+callers should read as "unknown", never as "empty".
+"""
+import socket
+import sys
+
+def players(port: int, timeout: float = 2.0) -> int:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(timeout)
+    try:
+        s.sendto(b"\xff\xff\xff\xffstatus\n", ("127.0.0.1", port))
+        data, _ = s.recvfrom(8192)
+    finally:
+        s.close()
+
+    # \xff\xff\xff\xff n <serverinfo>\n <player>\n <player>\n ...
+    body = data[5:].decode("latin-1", "replace")
+    lines = [ln for ln in body.split("\n") if ln.strip()]
+    # First line is the serverinfo string; each later line starts with a userid.
+    return sum(1 for ln in lines[1:] if ln.split(None, 1)[0].lstrip("-").isdigit())
+
+if __name__ == "__main__":
+    try:
+        print(players(int(sys.argv[1])))
+    except (IndexError, ValueError):
+        sys.exit("usage: fo-players <port>")
+    except OSError:
+        sys.exit(1)

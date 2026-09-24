@@ -1,0 +1,8 @@
+#!/command/with-contenv bash
+# SCHED_IDLE rather than a cpu quota: a quota throttles the sync even on an
+# idle box, while an idle-class task simply never preempts a running server.
+# The matching ionice class matters more in practice - this workload is three
+# `aws s3 sync`es and a curl loop, so iowait is the likelier source of a hitch.
+# entrypoint.sh sources ./sync.sh by relative path.
+cd /updater
+exec chrt --idle 0 ionice -c3 ./entrypoint.sh

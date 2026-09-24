@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# fo-init - lay out the persistent volume and point the basedir at it.
+#
+# Runs once at container start, before anything else. Everything it creates is
+# on /srv (the one data volume), so a recreated container keeps its maps, dats,
+# demos and stats; everything it links is in the image layer and is rebuilt
+# from scratch each boot.
+
+set -euo pipefail
+
+SRV=/srv
+CERTS=/certs
+
+mkdir -p "$SRV"/dats/{master,staging} "$SRV"/assets "$SRV"/shards
+
+# First boot on an empty volume: the image ships a usable set of dats, so seed
+# both tiers from it rather than leaving the servers unable to start until the
+# updater's first sync finishes.
+for tier in master staging; do
+  for dat in qwprogs csprogs menu; do
+    [[ -e $SRV/dats/$tier/$dat.dat ]] && continue
+    [[ -e /qwtfsv/fortress/dats/$dat.dat ]] || continue
+    cp /qwtfsv/fortress/dats/"$dat".dat "$SRV/dats/$tier/$dat.dat"
+  done
+done
+
+# Maps and the rest of the asset tree live on the volume so the updater's sync
+# survives a deploy. The image's fortress/{maps,skins,sound,...} are symlinks
+# into assets/, so redirecting assets/ moves all of them at once.
+if [[ ! -L /qwtfsv/fortress/assets ]]; then
+  if [[ -d /qwtfsv/fortress/assets ]]; then
+    cp -rn /qwtfsv/fortress/assets/. "$SRV/assets/" 2>/dev/null || true
+    rm -rf /qwtfsv/fortress/assets
+  fi
+  ln -sfn "$SRV/assets" /qwtfsv/fortress/assets
+fi
+mkdir -p "$SRV"/assets/maps
+
+# FTE reads the TLS pair from its working directory and has no cvar for the
+# path, so the only way to point it at certbot's output is a link in the
+# basedir. Absent or half-written certs leave the image's self-signed pair in
+# place: the game still works, only the browser live view refuses the socket.
+# TF_IP is the FQDN the shards bind and the name the certificate is issued
+# for; TF_DOMAIN only exists as an override for a host where they differ.
+fqdn="${TF_DOMAIN:-${TF_IP:-}}"
+live="$CERTS/live/$fqdn"
+if [[ -n $fqdn && -s $live/fullchain.pem && -s $live/privkey.pem ]]; then
+  ln -sfn "$live/fullchain.pem" /qwtfsv/fullchain.pem
+  ln -sfn "$live/privkey.pem"   /qwtfsv/privkey.pem
+  echo "fo-init: using certbot certificate for $fqdn"
+else
+  echo "fo-init: no certbot certificate for ${fqdn:-<unset>}; keeping the bundled self-signed pair" >&2
+fi

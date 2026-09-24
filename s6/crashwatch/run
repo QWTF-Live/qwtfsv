@@ -1,0 +1,5 @@
+#!/command/with-contenv bash
+exec python3 /opt/crashwatch/qwtf_crashwatch.py \
+  --interval 60 \
+  --shards /srv/shards \
+  --archive-dir /srv/crashes

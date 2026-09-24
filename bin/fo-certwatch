@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# fo-certwatch - restart shards onto a renewed certificate, one at a time,
+# without interrupting anyone's game.
+#
+# FTE reads fullchain.pem/privkey.pem once at startup and has no reload
+# command, so a renewal only takes effect on restart. Certbot runs in its own
+# container and cannot see when a shard is empty; this can, because it is in
+# the container with them.
+#
+# Each shard is restarted the first time it is observed empty. A shard that
+# never empties is left alone until FORCE_AFTER, on the reasoning that a
+# certificate renewed at the usual 30-days-remaining mark is in no hurry, and
+# dropping a live match to install it early would be the more expensive
+# mistake.
+
+set -euo pipefail
+
+CONF=/qwtfsv/shards.conf
+CERT=/qwtfsv/fullchain.pem
+POLL=${POLL:-60}
+FORCE_AFTER=${FORCE_AFTER:-43200}   # 12h
+
+fingerprint() {
+  # Follows the symlink into /certs, so this changes when certbot swaps the
+  # live target as well as when the file itself is rewritten.
+  openssl x509 -in "$CERT" -noout -fingerprint -sha256 2>/dev/null || echo none
+}
+
+shards() { awk '$1 !~ /^#/ && NF {print $1, $2}' "$CONF"; }
+
+log() { printf '[%(%Y-%m-%d %H:%M:%S)TZ] certwatch: %s\n' -1 "$*"; }
+
+known=$(fingerprint)
+log "watching $CERT"
+
+while sleep "$POLL"; do
+  current=$(fingerprint)
+  [[ $current == "$known" ]] && continue
+
+  log "certificate changed, draining shards onto it"
+  deadline=$(( $(date +%s) + FORCE_AFTER ))
+  pending=$(shards)
+
+  while [[ -n $pending ]]; do
+    remaining=""
+    while read -r name port; do
+      [[ -n $name ]] || continue
+      if count=$(fo-players "$port" 2>/dev/null) && [[ $count -eq 0 ]]; then
+        log "restarting $name (empty)"
+        s6-svc -r "/run/service/$name" || log "  ! s6-svc failed for $name"
+      elif [[ $(date +%s) -ge $deadline ]]; then
+        log "restarting $name (forced after ${FORCE_AFTER}s, ${count:-?} connected)"
+        s6-svc -r "/run/service/$name" || log "  ! s6-svc failed for $name"
+      else
+        remaining+="$name $port"$'\n'
+      fi
+    done <<<"$pending"
+
+    pending=$(printf '%s' "$remaining")
+    [[ -n $pending ]] && sleep "$POLL"
+  done
+
+  known=$current
+  log "all shards on the new certificate"
+done

@@ -1,3 +1,4 @@
 .env
 build.sh
 deploy.sh
+vendor/

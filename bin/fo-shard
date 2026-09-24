@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# fo-shard <name> - run one server shard in the foreground, under s6.
+#
+# Everything that differs between the five shards lives in shards.conf; this
+# turns one row of it into an fteqw-sv command line.
+#
+# The shard writes nothing to the shared basedir. -homedir gives it a private
+# tree under /srv/shards/<name>, which FTE both searches first and treats as
+# the only writable path (fs.c: the basedir gamedir is added without
+# SPF_WRITABLE once a homedir is enabled). So demos, stats, qconsole.log and
+# ssqccore.txt all land per-shard, and the shard's own dats shadow the image's.
+
+set -euo pipefail
+
+CONF=/qwtfsv/shards.conf
+SRV=/srv
+
+name="${1:?usage: fo-shard <name>}"
+
+row=$(awk -v n="$name" '$1==n && $1 !~ /^#/ {print; exit}' "$CONF")
+[[ -n $row ]] || { echo "fo-shard: no shard '$name' in $CONF" >&2; exit 1; }
+read -r _ port dats cfg map flags channel <<<"$row"
+
+home="$SRV/shards/$name"
+game="$home/fortress"
+
+# FTE only creates what it writes to, and the updater needs data/ to exist so
+# its inotify watch has something to attach to at boot.
+mkdir -p "$game"/{demos,data}
+
+# The tier's progs, shadowing the copies baked into the image. Refreshed on
+# every start so repointing a shard in shards.conf takes effect on restart
+# rather than needing the volume wiped.
+for dat in qwprogs csprogs menu; do
+  ln -sfn "$SRV/dats/$dats/$dat.dat" "$game/$dat.dat"
+done
+
+# Console input. Opened read-write rather than read-only: a FIFO with no
+# writer would block the exec below forever, and would deliver EOF to the
+# server every time a `console` session detached.
+fifo="$home/console.in"
+[[ -p $fifo ]] || { rm -f "$fifo"; mkfifo -m 600 "$fifo"; }
+
+# Pub is the bare address; the others have to name their port or clients
+# following a server list entry land on 27500.
+serverip="$TF_IP"
+[[ $port != 27500 ]] && serverip="$TF_IP:$port"
+
+[[ $channel == - ]] && channel="${TF_DISCORD_CHANNEL_ID:-}"
+
+title=$(tr '[:lower:]' '[:upper:]' <<<"${name:0:1}")${name:1}
+
+args=(
+  -ip "$TF_IP"
+  -port "$port"
+  -homedir "$home"
+  +set sv_port_tcp "$port"
+  +set net_enable_tls 1
+  +set hostname "$TF_HOSTNAME $title"
+)
+
+# Ordered exactly as production.yml had it, between hostname and rcon_password.
+[[ $flags == password ]] && args+=(+set password "$TF_PASSWORD")
+
+args+=(
+  +set rcon_password "$TF_RCON_PASSWORD"
+  +set sv_serverip "$serverip"
+  +set net_mtu "${TFL_MTU:-1440}"
+  +set timeout 10
+  +set log_enable 1
+  +localinfo adminpwd "$TF_ADMINPWD"
+  +localinfo discord_channel_id "$channel"
+  +localinfo shard "$name"
+)
+
+args+=(+exec "$cfg" +map "$map")
+
+# cwd is the basedir: FTE loads fullchain.pem/privkey.pem relative to it and
+# has no cvar for the path. The certs oneshot points those at /certs.
+cd /qwtfsv
+exec 0<>"$fifo"
+exec ./fteqw-sv "${args[@]}"

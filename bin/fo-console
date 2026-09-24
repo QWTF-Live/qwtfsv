@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# fo-console [shard] [command...] - read and drive a shard's console.
+#
+#   fo-console                 tmux session, one window per shard
+#   fo-console pub             follow pub's console, type to send
+#   fo-console pub status      send one command and exit
+#
+# Replaces `docker attach`, which cannot work here: five servers share one
+# container, so there is only one stdin to attach to. Each shard instead reads
+# from its own FIFO and writes to its own qconsole.log, and this joins the two
+# back together.
+#
+# For scripted use prefer rcon, which is authenticated and works off-host;
+# this exists for the interactive case.
+
+set -euo pipefail
+
+SRV=/srv
+CONF=/qwtfsv/shards.conf
+
+shards() { awk '$1 !~ /^#/ && NF {print $1}' "$CONF"; }
+
+# No shard named: one tmux window each, so ctrl-b n walks the fleet.
+if [[ $# -eq 0 ]]; then
+  command -v tmux >/dev/null || { echo "fo-console: tmux not installed" >&2; exit 1; }
+  if ! tmux has-session -t fo 2>/dev/null; then
+    first=true
+    while read -r s; do
+      if $first; then
+        tmux new-session -d -s fo -n "$s" "$0 $s"
+        first=false
+      else
+        tmux new-window -t fo -n "$s" "$0 $s"
+      fi
+    done < <(shards)
+    # Nested inside the operator's own tmux most of the time; ctrl-a keeps the
+    # inner and outer prefixes distinct.
+    tmux set-option -t fo prefix C-a
+    tmux set-option -t fo status-left '[console] '
+  fi
+  exec tmux attach -t fo
+fi
+
+name="$1"; shift
+shards | grep -qx "$name" || { echo "fo-console: no shard '$name'" >&2; exit 1; }
+
+log="$SRV/shards/$name/fortress/qconsole.log"
+fifo="$SRV/shards/$name/console.in"
+[[ -p $fifo ]] || { echo "fo-console: $name is not running" >&2; exit 1; }
+
+# One-shot: send and leave. No tail, so it is safe from scripts and hooks.
+if [[ $# -gt 0 ]]; then
+  printf '%s\n' "$*" >"$fifo"
+  exit 0
+fi
+
+touch "$log" 2>/dev/null || true
+tail -n 200 -F "$log" &
+tailpid=$!
+trap 'kill "$tailpid" 2>/dev/null || true' EXIT
+
+echo "--- $name console; ctrl-d to leave (the server keeps running) ---" >&2
+while IFS= read -r line; do
+  printf '%s\n' "$line" >"$fifo"
+done
