@@ -21,10 +21,31 @@ if ! docker run --rm --entrypoint grep qwtflive/updater:latest \
   exit 1
 fi
 
-# Build with BuildKit via buildx (the legacy `docker build` builder is deprecated),
-# then tag and push in a single step.
+# Build with BuildKit via buildx (the legacy `docker build` builder is
+# deprecated). Loaded but NOT pushed yet: nothing below has run the image, and
+# an image that cannot start is worth catching here rather than on a host.
 docker buildx build \
   --tag qwtflive/fortressone:latest \
   --load \
-  --push \
   .
+
+# tf-init is the one service whose failure is fatal - S6_BEHAVIOUR_IF_STAGE2_FAILS
+# stops the container - so a mistake in it costs every shard on the host. It
+# shipped broken once already: the s6 `up` file ran it with /bin/sh, which on
+# Ubuntu is dash, and the script needs bash for `set -o pipefail`. Nothing in a
+# build catches that, because a build never starts the image.
+echo "==> Smoke test: tf-init"
+if ! docker run --rm --entrypoint /qwtfsv/bin/tf-init qwtflive/fortressone:latest; then
+  echo "build: tf-init fails inside the image; not pushing." >&2
+  exit 1
+fi
+
+# And the shards must at least be able to parse their own launcher.
+echo "==> Smoke test: tf-shard argv"
+if ! docker run --rm --entrypoint bash qwtflive/fortressone:latest \
+     -n /qwtfsv/bin/tf-shard; then
+  echo "build: tf-shard does not parse inside the image; not pushing." >&2
+  exit 1
+fi
+
+docker push qwtflive/fortressone:latest

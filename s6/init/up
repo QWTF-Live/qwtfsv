@@ -1,1 +1,1 @@
-/command/with-contenv /bin/sh /qwtfsv/bin/tf-init
+/command/with-contenv /qwtfsv/bin/tf-init
